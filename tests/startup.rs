@@ -66,3 +66,24 @@ fn startup_fails_when_the_installation_has_no_version_file() -> TestResult {
     assert!(!output.status.success());
     Ok(())
 }
+
+#[test]
+fn startup_can_be_configured_through_environment_variables() -> TestResult {
+    let install_dir = std::env::temp_dir().join(format!("satisdockery-env-{}", std::process::id()));
+    write_version_file(&install_dir, 7)?;
+
+    let output = Command::new(env!("CARGO_BIN_EXE_satisdockery"))
+        .env("SATISDOCKERY_PATH", &install_dir)
+        .env("SATISDOCKERY_SKIP_UPDATE", "true")
+        .env("SATISDOCKERY_SKIP_RUN", "true")
+        .output()?;
+    fs::remove_dir_all(&install_dir)?;
+
+    let log = String::from_utf8_lossy(&output.stderr);
+    assert!(output.status.success(), "{log}");
+    assert!(
+        log.contains("Current mod build requirement: 7.0.0"),
+        "{log}"
+    );
+    Ok(())
+}

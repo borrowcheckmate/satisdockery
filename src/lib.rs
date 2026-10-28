@@ -3,6 +3,7 @@ pub mod depot;
 pub mod error;
 pub mod game;
 pub mod mods;
+pub mod server;
 
 pub use error::{Error, Result};
 
@@ -18,9 +19,16 @@ pub async fn run(args: &Args) -> Result<()> {
     }
     let game_version = game::GameVersion::read(&args.path).await?;
     log::info!("Current game version: {}", game_version.game_version);
-    log::info!(
-        "Current mod build requirement: {}",
-        game_version.mod_build_requirement()
-    );
+    let build_requirement = game_version.mod_build_requirement();
+    log::info!("Current mod build requirement: {build_requirement}");
+
+    let packages = mods::resolve_packages(&args.mods, build_requirement).await?;
+    log::info!("Resolved packages: {packages:?}");
+    mods::install(&args.path, &packages).await?;
+    log::info!("Preparation finished successfully!");
+
+    if !args.skip_run {
+        server::run(&args.path, &args.server)?;
+    }
     Ok(())
 }

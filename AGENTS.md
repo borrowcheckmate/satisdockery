@@ -17,7 +17,7 @@ cargo test --locked
 - Do not weaken lints. Do not add `#[allow]` without a `reason`.
 - Do not add documentation files besides those already in the repository root.
 - Keep files under 250 lines by splitting them into submodules.
-- Pin new dependencies to an exact version.
+- Pin new dependencies to an exact version, and disable default features that are not needed.
 - Write commit messages as Conventional Commits.
 
 ## Privacy

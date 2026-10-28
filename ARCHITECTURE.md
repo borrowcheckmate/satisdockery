@@ -18,6 +18,7 @@ SatisDockery is a library crate (`src/lib.rs`) with a thin binary (`src/main.rs`
 | --- | --- |
 | `cli` | Command line arguments |
 | `error` | The crate-wide `Error` and `Result` |
+| `command` | Running child processes and turning failures into errors |
 | `game` | The installed game version and the layout of the installation |
 | `depot` | Installing a checksum-verified DepotDownloader and running it |
 | `mods` | Mod resolution and installation |
@@ -49,4 +50,4 @@ These rules are enforced by clippy (`Cargo.toml`, `clippy.toml`) and pre-commit.
 
 ## Container
 
-The `Dockerfile` builds the binary and ships it in a Debian image together with `docker/init.sh`. On `aarch64` the image also installs a checksum-verified box64 package.
+The `Dockerfile` builds the binary and ships it in a slim Debian image whose entrypoint is `satisdockery`, configured through `SATISDOCKERY_*` environment variables. Dependencies compile in their own layer so source changes rebuild quickly. On `arm64` the image also installs a checksum-verified box64 package, because the server only exists for `x86_64`. CA certificates are installed because the HTTP client verifies TLS against the system store.

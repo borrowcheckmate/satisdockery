@@ -22,6 +22,8 @@ cargo deny check             # licenses and advisories
 
 Clippy is configured strictly in `Cargo.toml` and `clippy.toml`. Fix the warning instead of silencing it. If an `allow` is truly needed it must carry a `reason`.
 
+Dependencies, GitHub Actions and the base images are updated weekly by Dependabot. CI builds the container image for both architectures and starts it as a smoke test.
+
 ## Code style
 
 - Code explains itself through names and small functions. Add a comment only for a reason that the code cannot show.

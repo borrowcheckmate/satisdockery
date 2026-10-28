@@ -31,7 +31,28 @@ satisdockery --path /home/satisdockery/satisfactory --mods "RefinedPower:>=4.0.4
 | `--disable-seasonalevents` | off | Disable seasonal events |
 | `--additional-dedicatedserver-args` | none | Extra Unreal arguments, comma separated |
 
-Run `satisdockery --help` for the authoritative list.
+Every option can also be set through an environment variable named `SATISDOCKERY_` followed by the option in upper case, for example `SATISDOCKERY_PLAYERS=8` or `SATISDOCKERY_MODS=RefinedPower:>=4.0.44`. Switches take `true` or `false`. Run `satisdockery --help` for the authoritative list.
+
+## Docker
+
+```yaml
+services:
+  satisfactory:
+    image: ghcr.io/borrowcheckmate/satisdockery:latest
+    ports:
+      - "7777:7777/udp"
+      - "8888:8888/tcp"
+    environment:
+      SATISDOCKERY_PLAYERS: "8"
+      SATISDOCKERY_MODS: "RefinedPower:>=4.0.44"
+    volumes:
+      - satisfactory:/home/satisdockery/satisfactory
+
+volumes:
+  satisfactory:
+```
+
+The server is downloaded into the volume on the first start and updated on every start.
 
 ## Migrating from Wolveix's image
 

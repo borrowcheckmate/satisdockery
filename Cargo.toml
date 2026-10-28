@@ -1,0 +1,71 @@
+[package]
+name = "satisdockery"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+description = "Satisfactory dedicated server wrapper that downloads the game and resolves mods"
+license = "EUPL-1.2"
+repository = "https://github.com/borrowcheckmate/satisdockery"
+readme = "README.md"
+keywords = ["satisfactory", "docker", "dedicated-server", "mods"]
+categories = ["command-line-utilities"]
+publish = false
+
+# Exact versions on purpose: a dependency only changes when a reviewed commit changes it.
+[dependencies]
+clap = { version = "=4.6.1", features = ["derive"] }
+duct = "=1.1.1"
+hex = "=0.4.3"
+log = "=0.4.32"
+reqwest = { version = "=0.13.4", features = ["json"] }
+semver = { version = "=1.0.28", features = ["serde"] }
+serde = { version = "=1.0.228", features = ["derive"] }
+serde_json = "=1.0.150"
+sha2 = "=0.11.0"
+thiserror = "=2.0.18"
+tokio = { version = "=1.54.1", features = ["full"] }
+tracing-subscriber = "=0.3.23"
+zip = "=9.1.3"
+
+[lints.rust]
+unsafe_code = "forbid"
+unused_qualifications = "deny"
+missing_debug_implementations = "deny"
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }
+pedantic = { level = "deny", priority = -1 }
+nursery = { level = "deny", priority = -1 }
+cargo = { level = "deny", priority = -1 }
+# Duplicate transitive crates are policed by cargo-deny, where they can be waived per crate.
+multiple_crate_versions = "allow"
+# Failure modes must travel through `Result`, never through a panic.
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "deny"
+unimplemented = "deny"
+unreachable = "deny"
+indexing_slicing = "deny"
+string_slice = "deny"
+# Output goes through `log` so it can be filtered and redirected.
+print_stdout = "deny"
+print_stderr = "deny"
+dbg_macro = "deny"
+let_underscore_must_use = "deny"
+mod_module_files = "deny"
+allow_attributes_without_reason = "deny"
+undocumented_unsafe_blocks = "deny"
+clone_on_ref_ptr = "deny"
+rc_buffer = "deny"
+str_to_string = "deny"
+empty_drop = "deny"
+fn_to_numeric_cast_any = "deny"
+get_unwrap = "deny"
+lossy_float_literal = "deny"
+mem_forget = "deny"
+exit = "deny"
+if_then_some_else_none = "deny"
+semicolon_inside_block = "deny"
+separated_literal_suffix = "deny"
+verbose_file_reads = "deny"

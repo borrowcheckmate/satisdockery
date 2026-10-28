@@ -8,4 +8,7 @@ pub struct Args {
     /// Path to Satisfactory installation
     #[arg(long)]
     pub path: PathBuf,
+    /// Skip running the updater
+    #[arg(long)]
+    pub skip_update: bool,
 }

@@ -1,5 +1,10 @@
 # SatisDockery
 
+[![CI](https://github.com/borrowcheckmate/satisdockery/actions/workflows/ci.yml/badge.svg)](https://github.com/borrowcheckmate/satisdockery/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/borrowcheckmate/satisdockery?display_name=tag)](https://github.com/borrowcheckmate/satisdockery/releases)
+[![Container image](https://img.shields.io/badge/ghcr.io-satisdockery-2496ED?logo=docker&logoColor=white)](https://github.com/borrowcheckmate/satisdockery/pkgs/container/satisdockery)
+[![License: EUPL-1.2](https://img.shields.io/badge/license-EUPL--1.2-blue)](LICENSE)
+
 A Satisfactory dedicated server in Docker, with a Rust wrapper that downloads the server through DepotDownloader, resolves and installs mods from [ficsit.app](https://ficsit.app), and then starts the server.
 
 It runs on `x86_64` and on `aarch64` (through box64).

@@ -67,6 +67,14 @@ jobs:
         with:
           context: .
           platforms: ${{ matrix.platform }}
-          push: false
+          load: true
+          tags: satisdockery:ci
           cache-from: type=gha,scope=${{ matrix.platform }}
           cache-to: type=gha,mode=max,scope=${{ matrix.platform }}
+      - name: Image starts and has what it needs
+        run: |
+          docker run --rm satisdockery:ci --version
+          docker run --rm --entrypoint test satisdockery:ci -s /etc/ssl/certs/ca-certificates.crt
+      - name: Image runs the server through box64 on arm64
+        if: matrix.platform == 'linux/arm64'
+        run: docker run --rm --entrypoint box64 satisdockery:ci --version

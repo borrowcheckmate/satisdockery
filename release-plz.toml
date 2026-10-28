@@ -2,6 +2,8 @@
 # The crate is not published to crates.io; releases are git tags, GitHub releases and container images.
 git_only = true
 git_release_enable = true
+# Only release when a release pull request is merged, never straight from a push.
+release_always = false
 semver_check = false
 dependencies_update = true
 pr_labels = ["release"]

@@ -11,4 +11,7 @@ pub struct Args {
     /// Skip running the updater
     #[arg(long)]
     pub skip_update: bool,
+    /// Mods to install, for example: RefinedPower:>=4.0.44,SecondMod:>=1.0.10
+    #[arg(long, value_delimiter = ',')]
+    pub mods: Vec<String>,
 }

@@ -2,6 +2,7 @@ pub mod cli;
 pub mod depot;
 pub mod error;
 pub mod game;
+pub mod mods;
 
 pub use error::{Error, Result};
 

@@ -1,0 +1,28 @@
+query GetMultipleModsSpecificVersions($constraints: [ModVersionConstraint!]!) {
+  resolveModVersions(filter: $constraints) {
+    id
+    mod_reference
+    versions {
+      id
+      version
+      game_version
+      stability
+    	link
+      approved
+      mod {
+        compatibility {
+          EA {
+            state
+          }
+          EXP{
+            state
+          }
+        }
+      }
+      dependencies {
+        mod_reference
+        condition
+      }
+    }
+  }
+}

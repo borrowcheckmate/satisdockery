@@ -2,11 +2,9 @@ mod arguments;
 mod permissions;
 mod settings;
 
-use std::path::Path;
+use std::{path::Path, process::Command};
 
-use duct::cmd;
-
-use crate::{Error, Result, game};
+use crate::{Error, Result, command, game};
 
 pub use settings::ServerSettings;
 
@@ -27,9 +25,11 @@ pub fn run(install_dir: &Path, settings: &ServerSettings) -> Result<()> {
         .to_str()
         .ok_or_else(|| Error::NonUtf8Path(executable.clone()))?;
     let (program, arguments) = launch_command(executable, arguments::unreal_arguments(settings));
-    cmd(program, arguments)
-        .env("UE_PROJECT_ROOT", install_dir)
-        .run()?;
+    command::run(
+        Command::new(program)
+            .args(arguments)
+            .env("UE_PROJECT_ROOT", install_dir),
+    )?;
     log::info!("Server shutdown completed");
     Ok(())
 }

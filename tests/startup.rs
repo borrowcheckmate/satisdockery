@@ -46,10 +46,10 @@ fn startup_uses_changelist_for_mod_compatibility() -> TestResult {
         "{}",
         String::from_utf8_lossy(&output.stderr)
     );
-    let stdout = String::from_utf8_lossy(&output.stdout);
+    let log = String::from_utf8_lossy(&output.stderr);
     assert!(
-        stdout.contains("Current mod build requirement: 424242.0.0"),
-        "{stdout}"
+        log.contains("Current mod build requirement: 424242.0.0"),
+        "{log}"
     );
     Ok(())
 }

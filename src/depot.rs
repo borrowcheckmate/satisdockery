@@ -2,14 +2,12 @@ mod checksum;
 mod release;
 
 use std::{
-    ffi::OsString,
     io::Cursor,
     path::{Path, PathBuf},
+    process::Command,
 };
 
-use duct::cmd;
-
-use crate::Result;
+use crate::{Result, command};
 
 /// Satisfactory Steam app id
 const APP_ID: &str = "1690800";
@@ -29,16 +27,11 @@ pub async fn download_dedicated_server(install_dir: &Path) -> Result<()> {
 }
 
 fn run_depot_downloader(executable: &Path, install_dir: &Path) -> Result<()> {
-    let arguments: Vec<OsString> = vec![
-        "-app".into(),
-        APP_ID.into(),
-        "-os".into(),
-        "linux".into(),
-        "-dir".into(),
-        install_dir.into(),
-    ];
-    cmd(executable, arguments).run()?;
-    Ok(())
+    command::run(
+        Command::new(executable)
+            .args(["-app", APP_ID, "-os", "linux", "-dir"])
+            .arg(install_dir),
+    )
 }
 
 async fn ensure_depot_downloader(install_dir: &Path) -> Result<PathBuf> {

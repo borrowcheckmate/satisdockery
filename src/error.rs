@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, process::ExitStatus};
 
 use thiserror::Error;
 
@@ -18,6 +18,8 @@ pub enum Error {
     Version(#[from] semver::Error),
     #[error("JSON error: {0}")]
     Json(#[from] serde_json::Error),
+    #[error("{program} exited unsuccessfully: {status}")]
+    CommandFailed { program: String, status: ExitStatus },
     #[error("Invalid mod reference: {0}")]
     InvalidModReference(String),
     #[error("Path is not valid UTF-8: {}", .0.display())]

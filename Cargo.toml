@@ -13,19 +13,18 @@ publish = false
 
 # Exact versions on purpose: a dependency only changes when a reviewed commit changes it.
 [dependencies]
-clap = { version = "=4.6.1", features = ["derive"] }
-duct = "=1.1.1"
+clap = { version = "=4.6.1", features = ["derive", "env"] }
+env_logger = { version = "=0.11.11", default-features = false, features = ["auto-color", "humantime"] }
 hex = "=0.4.3"
 log = "=0.4.32"
-reqwest = { version = "=0.13.4", features = ["json"] }
+reqwest = { version = "=0.13.4", default-features = false, features = ["json", "rustls"] }
 semver = { version = "=1.0.28", features = ["serde"] }
 serde = { version = "=1.0.228", features = ["derive"] }
 serde_json = "=1.0.150"
 sha2 = "=0.11.0"
 thiserror = "=2.0.18"
-tokio = { version = "=1.54.1", features = ["full"] }
-tracing-subscriber = "=0.3.23"
-zip = "=9.1.3"
+tokio = { version = "=1.54.1", features = ["fs", "macros", "rt-multi-thread"] }
+zip = { version = "=9.1.3", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 
 [lints.rust]
 unsafe_code = "forbid"

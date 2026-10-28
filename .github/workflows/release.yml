@@ -128,6 +128,9 @@ jobs:
       - name: Combine the platform images into one tag
         working-directory: ${{ runner.temp }}/digests
         run: |
-          docker buildx imagetools create \
-            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "${DOCKER_METADATA_OUTPUT_JSON}") \
-            $(printf '${IMAGE}@sha256:%s ' *)
+          mapfile -t tags < <(jq -r '.tags[] | "-t", .' <<< "${DOCKER_METADATA_OUTPUT_JSON}")
+          sources=()
+          for digest in *; do
+            sources+=("${IMAGE}@sha256:${digest}")
+          done
+          docker buildx imagetools create "${tags[@]}" "${sources[@]}"

@@ -1,162 +1,165 @@
+mod store;
+#[cfg(test)]
+mod tests;
+
 use std::{
-    io::Cursor,
-    path::{Path, PathBuf},
+    collections::HashSet,
+    fs,
+    future::Future,
+    io::{self, Cursor},
+    path::Path,
 };
 
+use semver::Version;
 use serde::Deserialize;
 
 use super::Package;
 use crate::{Error, Result};
 
-/// Endpoint to the ficsit.app REST api (<https://ficsit.app/api-docs>)
+use store::{Record, Store};
+
+/// Endpoint to the ficsit.app REST API.
 const REST_API: &str = "https://api.ficsit.app/";
 
 #[derive(Deserialize)]
 struct PluginDescriptor {
     #[serde(default, rename = "GameFeature")]
     game_feature: bool,
+    #[serde(rename = "VersionName")]
+    version_name: Option<String>,
 }
 
-/// Downloads every package and extracts it into the installation's mods directory.
+/// Reconciles packages with the installed mods owned by `SatisDockery`.
 ///
 /// # Errors
-/// Fails when a download fails or an archive is not a valid mod.
+/// Fails when a package cannot be installed or an owned mod cannot be removed safely.
 pub async fn install(install_dir: &Path, packages: &[Package]) -> Result<()> {
     let client = reqwest::Client::new();
-    for package in packages {
-        log::info!("Installing {} {}...", package.name, package.version);
-        let url = format!("{REST_API}{}", package.link.trim_start_matches('/'));
-        let archive = client
-            .get(url)
-            .send()
-            .await?
-            .error_for_status()?
-            .bytes()
-            .await?;
-        extract(install_dir, &package.name, &archive)?;
-        log::info!("Installed {} {}", package.name, package.version);
-    }
-    Ok(())
+    reconcile(install_dir, packages, |link: String| {
+        let url = format!("{REST_API}{}", link.trim_start_matches('/'));
+        let client = &client;
+        async move {
+            Ok(client
+                .get(url)
+                .send()
+                .await?
+                .error_for_status()?
+                .bytes()
+                .await?)
+        }
+    })
+    .await
 }
 
-fn extract(install_dir: &Path, name: &str, archive: &[u8]) -> Result<()> {
-    ensure_valid_directory_name(name)?;
-    let mut archive = zip::ZipArchive::new(Cursor::new(archive))?;
-    let descriptor: PluginDescriptor =
-        serde_json::from_reader(archive.by_name(&format!("{name}.uplugin"))?)?;
-    archive.extract(plugin_directory(install_dir, name, &descriptor))?;
-    Ok(())
+async fn reconcile<B: AsRef<[u8]>, F: Future<Output = Result<B>>>(
+    install_dir: &Path,
+    packages: &[Package],
+    mut fetch: impl FnMut(String) -> F,
+) -> Result<()> {
+    let names = validate_packages(packages)?;
+    let Some(store) = Store::open(install_dir, !packages.is_empty())? else {
+        return Ok(());
+    };
+    store.recover()?;
+    for package in packages {
+        let existing = store.find(&package.name)?;
+        if needs_install(package, existing.as_deref())? {
+            let archive = fetch(package.link.clone()).await?;
+            install_package(&store, package, existing.as_deref(), archive.as_ref())?;
+            log::info!("Installed mod {} {}", package.name, package.version);
+        } else {
+            log::info!("Kept mod {} {}", package.name, package.version);
+        }
+    }
+    store.remove_unrequested(&names)
+}
+
+fn validate_packages(packages: &[Package]) -> Result<HashSet<&str>> {
+    let mut names = HashSet::new();
+    for package in packages {
+        ensure_valid_directory_name(&package.name)?;
+        if !names.insert(package.name.as_str()) {
+            return Err(io::Error::other(format!("Duplicate mod {}", package.name)).into());
+        }
+    }
+    Ok(names)
+}
+
+fn needs_install(package: &Package, existing: Option<&Path>) -> Result<bool> {
+    let Some(path) = existing else {
+        return Ok(true);
+    };
+    let descriptor = path.join(format!("{}.uplugin", package.name));
+    if let Some(record) = Record::read(path)? {
+        if record.name != package.name {
+            return Err(io::Error::other(format!(
+                "Mod {} conflicts with the installed mod {}",
+                package.name, record.name
+            ))
+            .into());
+        }
+        return Ok(record.version != package.version || !regular_file(&descriptor)?);
+    }
+    if regular_file(&descriptor)? {
+        let descriptor: PluginDescriptor = serde_json::from_slice(&fs::read(descriptor)?)?;
+        if descriptor
+            .version_name
+            .as_deref()
+            .and_then(|version| Version::parse(version).ok())
+            == Some(package.version.clone())
+        {
+            return Ok(false);
+        }
+    }
+    Err(io::Error::other(format!(
+        "Move the unmanaged mod {} out of FactoryGame/Mods before installing version {}",
+        package.name, package.version
+    ))
+    .into())
+}
+
+fn install_package(
+    store: &Store,
+    package: &Package,
+    existing: Option<&Path>,
+    contents: &[u8],
+) -> Result<()> {
+    let mut archive = zip::ZipArchive::new(Cursor::new(contents))?;
+    let descriptor_name = format!("{}.uplugin", package.name);
+    let descriptor: PluginDescriptor = serde_json::from_reader(archive.by_name(&descriptor_name)?)?;
+    let staging = store.staging();
+    archive.extract(&staging)?;
+    if !regular_file(&staging.join(descriptor_name))? {
+        return Err(
+            io::Error::other("The extracted plugin descriptor must be a regular file").into(),
+        );
+    }
+    let record = Record {
+        name: package.name.clone(),
+        version: package.version.clone(),
+        game_feature: descriptor.game_feature,
+    };
+    record.write(&staging)?;
+    store.publish(&staging, &record, existing)
 }
 
 /// Mod references become directory names, so references from API metadata must not escape.
 fn ensure_valid_directory_name(name: &str) -> Result<()> {
-    if name.is_empty() || name == "." || name == ".." || name.contains(['/', '\\']) {
+    if name.is_empty()
+        || matches!(name, "." | "..")
+        || name.eq_ignore_ascii_case("GameFeatures")
+        || name.eq_ignore_ascii_case(store::STATE_DIR)
+        || name.contains(['/', '\\', ':', '\0'])
+    {
         return Err(Error::InvalidModReference(name.to_owned()));
     }
     Ok(())
 }
 
-fn plugin_directory(install_dir: &Path, name: &str, descriptor: &PluginDescriptor) -> PathBuf {
-    let mut mods = install_dir.join("FactoryGame/Mods");
-    if descriptor.game_feature {
-        mods.push("GameFeatures");
-    }
-    mods.join(name)
-}
-
-#[cfg(test)]
-mod tests {
-    use std::{fs, io::Write};
-
-    use zip::write::SimpleFileOptions;
-
-    use super::*;
-
-    fn mod_archive(name: &str, descriptor: &str) -> Vec<u8> {
-        let mut archive = zip::ZipWriter::new(Cursor::new(Vec::new()));
-        let options =
-            SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
-        archive
-            .start_file(format!("{name}.uplugin"), options)
-            .unwrap();
-        archive.write_all(descriptor.as_bytes()).unwrap();
-        archive
-            .start_file("Binaries/Linux/module.so", options)
-            .unwrap();
-        archive.write_all(b"module").unwrap();
-        archive.finish().unwrap().into_inner()
-    }
-
-    fn install_dir(test: &str) -> PathBuf {
-        let path = std::env::temp_dir().join(format!("satisdockery-{test}-{}", std::process::id()));
-        fs::create_dir_all(&path).unwrap();
-        path
-    }
-
-    #[test]
-    fn installs_archives_in_their_plugin_directories() {
-        let dir = install_dir("plugin-directories");
-        for (name, descriptor, directory) in [
-            ("SML", "{}", "SML"),
-            ("NormalMod", r#"{"GameFeature":false}"#, "NormalMod"),
-            (
-                "FeatureMod",
-                r#"{"GameFeature":true}"#,
-                "GameFeatures/FeatureMod",
-            ),
-        ] {
-            extract(&dir, name, &mod_archive(name, descriptor)).unwrap();
-
-            let installed = dir.join("FactoryGame/Mods").join(directory);
-            assert_eq!(
-                fs::read(installed.join(format!("{name}.uplugin"))).unwrap(),
-                descriptor.as_bytes()
-            );
-            assert_eq!(
-                fs::read(installed.join("Binaries/Linux/module.so")).unwrap(),
-                b"module"
-            );
-        }
-        fs::remove_dir_all(dir).unwrap();
-    }
-
-    #[test]
-    fn leaves_saves_and_other_mods_untouched() {
-        let dir = install_dir("untouched");
-        fs::create_dir_all(dir.join("FactoryGame/Mods/Existing")).unwrap();
-        fs::write(
-            dir.join("FactoryGame/Mods/Existing/Existing.uplugin"),
-            b"{}",
-        )
-        .unwrap();
-        fs::create_dir_all(dir.join("FactoryGame/Saved")).unwrap();
-        fs::write(dir.join("FactoryGame/Saved/world.sav"), b"save").unwrap();
-
-        extract(&dir, "NewMod", &mod_archive("NewMod", "{}")).unwrap();
-
-        assert_eq!(
-            fs::read(dir.join("FactoryGame/Saved/world.sav")).unwrap(),
-            b"save"
-        );
-        assert!(
-            dir.join("FactoryGame/Mods/Existing/Existing.uplugin")
-                .is_file()
-        );
-        fs::remove_dir_all(dir).unwrap();
-    }
-
-    #[test]
-    fn rejects_invalid_archives_and_names_without_installing_anything() {
-        let dir = install_dir("rejects");
-        let archive = mod_archive("Mod", "{}");
-
-        assert!(extract(&dir, "MissingDescriptor", &archive).is_err());
-        assert!(extract(&dir, "BrokenMod", b"not a zip").is_err());
-        for invalid in ["", ".", "..", "../escape", "nested/mod", "nested\\mod"] {
-            assert!(extract(&dir, invalid, &archive).is_err());
-        }
-
-        assert!(!dir.join("FactoryGame/Mods").exists());
-        fs::remove_dir_all(dir).unwrap();
+fn regular_file(path: &Path) -> io::Result<bool> {
+    match fs::symlink_metadata(path) {
+        Ok(metadata) => Ok(metadata.is_file()),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(false),
+        Err(error) => Err(error),
     }
 }

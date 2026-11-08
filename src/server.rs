@@ -1,7 +1,12 @@
+mod api;
 mod arguments;
+mod console;
 mod idle;
 mod permissions;
+mod process;
 mod settings;
+mod stop;
+mod wake;
 
 use std::{path::Path, process::Command};
 
@@ -23,10 +28,7 @@ pub fn run(install_dir: &Path, settings: &ServerSettings) -> Result<()> {
 }
 
 pub(crate) async fn run_configured(install_dir: &Path, settings: &ServerSettings) -> Result<()> {
-    if let Some(timeout) = settings.idle_timeout {
-        return idle::run(server_command(install_dir, settings)?, settings, timeout).await;
-    }
-    run(install_dir, settings)
+    process::run(server_command(install_dir, settings)?, settings).await
 }
 
 fn server_command(install_dir: &Path, settings: &ServerSettings) -> Result<Command> {

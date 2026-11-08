@@ -90,9 +90,14 @@ fn needs_install(package: &Package, existing: Option<&Path>) -> Result<bool> {
         return Ok(true);
     };
     let descriptor = path.join(format!("{}.uplugin", package.name));
-    if let Some(record) = Record::read(path)?
-        && record.name == package.name
-    {
+    if let Some(record) = Record::read(path)? {
+        if record.name != package.name {
+            return Err(io::Error::other(format!(
+                "Mod {} conflicts with the installed mod {}",
+                package.name, record.name
+            ))
+            .into());
+        }
         return Ok(record.version != package.version || !regular_file(&descriptor)?);
     }
     if regular_file(&descriptor)? {

@@ -217,3 +217,13 @@ fn recovers_an_interrupted_replacement() {
     drop(store);
     fs::remove_dir_all(dir).unwrap();
 }
+
+#[test]
+fn rejects_a_conflicting_ownership_record() {
+    let dir = install_dir("conflicting-owner");
+    install_fixture(&dir, "Mod", &mod_archive("Mod", "{}")).unwrap();
+    let installed = dir.join("FactoryGame/Mods/Mod");
+    assert!(needs_install(&package("mod", 1), Some(&installed)).is_err());
+    assert!(installed.join("Mod.uplugin").is_file());
+    fs::remove_dir_all(dir).unwrap();
+}

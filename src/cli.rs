@@ -25,3 +25,26 @@ pub struct Args {
     #[command(flatten)]
     pub server: ServerSettings,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn api_features_accept_loopback_access_or_a_token_file() {
+        for feature in [&["--console"][..], &["--idle-timeout", "900"][..]] {
+            let mut command = vec!["satisdockery", "--path", "game"];
+            command.extend_from_slice(feature);
+            assert!(Args::try_parse_from(&command).is_err());
+
+            let mut local = command.clone();
+            local.push("--trust-local-api");
+            assert!(Args::try_parse_from(local).unwrap().server.trust_local_api);
+
+            command.extend(["--api-token-file", "token"]);
+            let token = Args::try_parse_from(command).unwrap().server;
+            assert_eq!(token.idle_api_token_file, Some(PathBuf::from("token")));
+            assert!(!token.trust_local_api);
+        }
+    }
+}

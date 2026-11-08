@@ -17,23 +17,7 @@ use crate::{Result, command};
 const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(30);
 
 pub(super) async fn run(mut command: Command, settings: &ServerSettings) -> Result<()> {
-    let api = if settings.console || settings.idle_timeout.is_some() {
-        if settings.game_port == 0 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "Server API access requires a fixed game port",
-            )
-            .into());
-        }
-        // The application token must only go to the game process this wrapper launches.
-        drop(TcpListener::bind((
-            Ipv4Addr::LOCALHOST,
-            settings.game_port,
-        ))?);
-        Some(Api::new(settings).await?)
-    } else {
-        None
-    };
+    let api = configure_api(&mut command, settings).await?;
     let input = if settings.console {
         command.stdin(Stdio::null());
         api.as_ref()
@@ -53,6 +37,30 @@ pub(super) async fn run(mut command: Command, settings: &ServerSettings) -> Resu
     }
     log::info!("Server shutdown complete");
     Ok(())
+}
+
+async fn configure_api(command: &mut Command, settings: &ServerSettings) -> Result<Option<Api>> {
+    if !settings.console && settings.idle_timeout.is_none() {
+        return Ok(None);
+    }
+    if settings.game_port == 0 {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "Server API access requires a fixed game port",
+        )
+        .into());
+    }
+    // Check that the local API port does not already belong to another process.
+    drop(TcpListener::bind((
+        Ipv4Addr::LOCALHOST,
+        settings.game_port,
+    ))?);
+    let api = Api::new(settings).await?;
+    if settings.trust_local_api && settings.idle_api_token_file.is_none() {
+        command.arg("-ini:Engine:[SystemSettings]:FG.DedicatedServer.AllowInsecureLocalAccess=1");
+        log::info!("Enabled Satisfactory admin API access for loopback clients");
+    }
+    Ok(Some(api))
 }
 
 async fn supervise(

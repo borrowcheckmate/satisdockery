@@ -35,5 +35,5 @@ COPY --from=builder /work/target/release/satisdockery /usr/bin/satisdockery
 USER satisdockery
 WORKDIR /home/satisdockery
 ENV SATISDOCKERY_PATH=/home/satisdockery/satisfactory
-EXPOSE 7777/udp 8888/tcp
+EXPOSE 7777/udp 7777/tcp 8888/tcp
 ENTRYPOINT ["satisdockery"]

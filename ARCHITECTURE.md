@@ -37,7 +37,7 @@ DepotDownloader releases are pinned per architecture together with the SHA-256 o
 
 ### `server`
 
-`settings` defines the server options, `arguments` turns them into Unreal command line arguments, and `permissions` restores execute bits that depot downloads do not preserve. On `aarch64` the server is started through `box64`.
+`settings` defines the server options, `arguments` turns them into Unreal command line arguments, and `permissions` restores execute bits that depot downloads do not preserve. On `aarch64` the server is started through `box64`. When idle shutdown is enabled, `idle` supervises the game process, saves and shuts it down through the HTTPS API, and listens on the UDP game port between launches.
 
 ## Layout rules
 

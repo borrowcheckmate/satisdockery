@@ -26,7 +26,7 @@ satisdockery --path /home/satisdockery/satisfactory --mods "RefinedPower:>=4.0.4
 | `--skip-update` | off | Do not download or update the server |
 | `--skip-run` | off | Prepare the installation but do not start the server |
 | `--players` | `4` | Maximum number of players |
-| `--game-port` | `7777` | Game port (UDP) |
+| `--game-port` | `7777` | Game and HTTPS API port (UDP and TCP) |
 | `--messaging-port` | `8888` | Messaging port (TCP) |
 | `--max-autosaves` | `5` | Number of rotating autosaves |
 | `--max-objects` | `2162688` | Maximum number of objects in the world |
@@ -34,6 +34,8 @@ satisdockery --path /home/satisdockery/satisfactory --mods "RefinedPower:>=4.0.4
 | `--max-timeout` | `10` | Seconds until an unresponsive player is kicked |
 | `--enable-serverstreaming` | off | Only stream part of the world to clients |
 | `--disable-seasonalevents` | off | Disable seasonal events |
+| `--idle-timeout` | off | Seconds without players before saving and stopping the game |
+| `--idle-api-token-file` | none | File containing the application API token for idle shutdown |
 | `--additional-dedicatedserver-args` | none | Extra Unreal arguments, comma separated |
 
 Every option can also be set through an environment variable named `SATISDOCKERY_` followed by the option in upper case, for example `SATISDOCKERY_PLAYERS=8` or `SATISDOCKERY_MODS=RefinedPower:>=4.0.44`. Switches take `true` or `false`. Run `satisdockery --help` for the authoritative list.
@@ -59,6 +61,16 @@ volumes:
 ```
 
 The server is downloaded into the volume on the first start and updated on every start.
+
+## Idle shutdown and UDP wake
+
+1. Start the server normally, claim it, and set **Auto-Load Session Name** to the session you want to resume.
+2. In Server Manager's console, run `server.GenerateAPIToken`. Put the token in a file readable by SatisDockery. With Docker, mount the file as a read-only secret.
+3. Set `SATISDOCKERY_IDLE_TIMEOUT=900` and `SATISDOCKERY_IDLE_API_TOKEN_FILE` to the path of that file inside the container. Publish the game port over both UDP and TCP as shown above.
+
+SatisDockery checks the game over HTTPS on loopback. The server stays up if a poll or save fails, or if the active session differs from the session set to autoload. Each session has a dedicated save with the prefix `SatisDockery_Idle_`.
+
+After an idle shutdown, the container stays up. A valid UDP status poll starts the game again. Opening Server Manager or running a UDP status monitor can wake it even if nobody joins. If the first join times out, wait for the world to load and try again.
 
 ## Migrating from Wolveix's image
 

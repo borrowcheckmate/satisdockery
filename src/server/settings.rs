@@ -45,11 +45,14 @@ pub struct ServerSettings {
         requires = "idle_api_token_file"
     )]
     pub idle_timeout: Option<NonZeroU64>,
-    /// File containing the server's application API token for idle shutdown.
+    /// Forward terminal input to the game console over the server API.
+    #[arg(long, env = "SATISDOCKERY_CONSOLE", requires = "idle_api_token_file")]
+    pub console: bool,
+    /// File containing the server's application API token for console access or idle shutdown.
     #[arg(
         long,
-        env = "SATISDOCKERY_IDLE_API_TOKEN_FILE",
-        requires = "idle_timeout"
+        visible_alias = "api-token-file",
+        env = "SATISDOCKERY_IDLE_API_TOKEN_FILE"
     )]
     pub idle_api_token_file: Option<PathBuf>,
     /// Add Unreal arguments for the dedicated server if you want to do anything more besides the default args

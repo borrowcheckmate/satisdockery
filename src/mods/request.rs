@@ -36,7 +36,7 @@ pub fn parse_all(entries: &[String]) -> Result<Vec<ModRequest>> {
     let mut requests = Vec::new();
     for entry in entries {
         let Some((name, constraint)) = entry.split_once(':') else {
-            log::warn!("Invalid request provided: {entry}");
+            log::warn!("Skipping mod request without a version constraint: {entry}");
             continue;
         };
         requests.push(ModRequest {

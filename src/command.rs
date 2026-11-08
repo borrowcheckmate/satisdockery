@@ -1,4 +1,4 @@
-use std::process::Command;
+use std::process::{Command, ExitStatus};
 
 use crate::{Error, Result};
 
@@ -8,6 +8,10 @@ use crate::{Error, Result};
 /// Fails when the process cannot be started or exits unsuccessfully.
 pub fn run(command: &mut Command) -> Result<()> {
     let status = command.status()?;
+    check_status(command, status)
+}
+
+pub(crate) fn check_status(command: &Command, status: ExitStatus) -> Result<()> {
     if status.success() {
         Ok(())
     } else {

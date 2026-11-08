@@ -27,7 +27,7 @@ impl Api {
         let token_file = settings.idle_api_token_file.as_ref().ok_or_else(|| {
             io::Error::new(
                 io::ErrorKind::InvalidInput,
-                "Idle shutdown requires an API token file",
+                "Server API access requires an application token file",
             )
         })?;
         let token = tokio::fs::read_to_string(token_file).await?;
@@ -77,6 +77,13 @@ impl Api {
         Ok(())
     }
 
+    pub(super) async fn run_command(&self, command: &str) -> Result<(String, bool)> {
+        let data = self
+            .call("RunCommand", json!({ "command": command }))
+            .await?;
+        command_result(data)
+    }
+
     async fn call(&self, function: &str, data: Value) -> Result<Value> {
         let timeout = if function == "SaveGame" {
             Duration::from_secs(120)
@@ -103,6 +110,19 @@ impl Api {
     }
 }
 
+fn command_result(data: Value) -> Result<(String, bool)> {
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct Output {
+        #[serde(default)]
+        command_result: String,
+        return_value: Option<bool>,
+    }
+
+    let output: Output = serde_json::from_value(data)?;
+    Ok((output.command_result, output.return_value.unwrap_or(true)))
+}
+
 fn completed_response(body: &[u8], function: &str) -> Result<Value> {
     #[derive(Deserialize)]
     #[serde(rename_all = "camelCase")]
@@ -122,6 +142,17 @@ fn completed_response(body: &[u8], function: &str) -> Result<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parses_console_output_and_failure() {
+        let data = json!({ "commandResult": "Unknown command", "returnValue": false });
+        assert_eq!(
+            command_result(data).unwrap(),
+            ("Unknown command".into(), false)
+        );
+        let older = json!({ "commandResult": "Game saved" });
+        assert_eq!(command_result(older).unwrap(), ("Game saved".into(), true));
+    }
 
     #[test]
     fn an_api_error_in_a_successful_http_response_is_still_a_failure() {

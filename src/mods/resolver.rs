@@ -78,10 +78,10 @@ impl Resolver {
         if self.versions.contains_key(name) {
             return Ok(true);
         }
-        log::info!("Fetching additional mod: {name}");
+        log::debug!("Resolving dependency {name}");
         let fetched = catalog::fetch(&[ModRequest::any_version(name)?]).await?;
         let Some(resolved) = fetched.into_iter().next() else {
-            log::warn!("Could not fetch mod: {name}");
+            log::warn!("Could not fetch mod {name}");
             return Ok(false);
         };
         self.versions.insert(name.to_owned(), resolved.versions);

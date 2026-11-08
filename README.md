@@ -36,6 +36,7 @@ satisdockery --path /home/satisdockery/satisfactory --mods "RefinedPower:>=4.0.4
 | `--enable-serverstreaming` | off | Only stream part of the world to clients |
 | `--disable-seasonalevents` | off | Disable seasonal events |
 | `--idle-timeout` | off | Seconds without players before saving and stopping the game |
+| `--trust-local-api` | off | Allow tokenless admin API access from loopback |
 | `--idle-api-token-file` | none | Application API token file for idle shutdown or the terminal console |
 | `--console` | off | Forward terminal input to the server console |
 | `--additional-dedicatedserver-args` | none | Extra Unreal arguments, comma separated |
@@ -74,11 +75,16 @@ volumes:
 
 The server is downloaded into the volume on the first start and updated on every start.
 
+## Local API access
+
+For a container on Docker's default bridge network, set `SATISDOCKERY_TRUST_LOCAL_API=true` to use idle shutdown or the terminal console without creating a token. SatisDockery enables the game's loopback-only admin access when either feature is active. Any process that can connect through the game's loopback interface gets admin API access.
+
+Use token authentication with host networking, shared network namespaces, or a proxy that connects to the game over loopback. In Server Manager's console, run `server.GenerateAPIToken` and mount the resulting token file as a read-only secret. Set `SATISDOCKERY_IDLE_API_TOKEN_FILE` to its path inside the container. A configured token file takes precedence over the loopback setting.
+
 ## Idle shutdown and UDP wake
 
 1. Start the server normally, claim it, and set **Auto-Load Session Name** to the session you want to resume.
-2. In Server Manager's console, run `server.GenerateAPIToken`. Put the token in a file readable by SatisDockery. With Docker, mount the file as a read-only secret.
-3. Set `SATISDOCKERY_IDLE_TIMEOUT=900` and `SATISDOCKERY_IDLE_API_TOKEN_FILE` to the path of that file inside the container. Publish the game port over both UDP and TCP as shown above.
+2. Configure [local API access](#local-api-access) and set `SATISDOCKERY_IDLE_TIMEOUT=900`. Publish the game port over both UDP and TCP as shown above.
 
 SatisDockery checks the game over HTTPS on loopback. The server stays up if a poll or save fails, or if the active session differs from the session set to autoload. Each session has a dedicated save with the prefix `SatisDockery_Idle_`.
 
@@ -86,7 +92,7 @@ After an idle shutdown, the container stays up. A valid UDP status poll starts t
 
 ## Attached server console
 
-Generate an application API token in Server Manager using `server.GenerateAPIToken`. Mount the token file as a read-only secret and set `SATISDOCKERY_IDLE_API_TOKEN_FILE` to its path inside the container. Set `SATISDOCKERY_CONSOLE=true` and enable `stdin_open: true` and `tty: true` in Compose. With `docker run`, use `-it` instead.
+Configure [local API access](#local-api-access). Set `SATISDOCKERY_CONSOLE=true` and enable `stdin_open: true` and `tty: true` in Compose. With `docker run`, use `-it` instead.
 
 Attach with `docker attach <container>`. Each nonempty line goes to the game's HTTPS console API, and the response appears in the container output. Use Ctrl-P then Ctrl-Q to detach. If the game is asleep, wake it through the game client before sending console commands.
 

@@ -46,6 +46,7 @@ services:
     image: ghcr.io/borrowcheckmate/satisdockery:latest
     ports:
       - "7777:7777/udp"
+      - "7777:7777/tcp"
       - "8888:8888/tcp"
     environment:
       SATISDOCKERY_PLAYERS: "8"

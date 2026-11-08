@@ -1,3 +1,5 @@
+use std::{num::NonZeroU64, path::PathBuf};
+
 use clap::Args;
 
 #[allow(
@@ -9,7 +11,7 @@ pub struct ServerSettings {
     /// Amount of max players
     #[arg(long, env = "SATISDOCKERY_PLAYERS", default_value_t = 4)]
     pub players: u32,
-    /// Port where the gameserver is exposed (UDP)
+    /// Port where the game and HTTPS API are exposed (UDP and TCP)
     #[arg(long, env = "SATISDOCKERY_GAME_PORT", default_value_t = 7777)]
     pub game_port: u16,
     /// Port where the messaging port is exposed (TCP)
@@ -36,6 +38,20 @@ pub struct ServerSettings {
     /// Disable seasonal events like ficmas (whyy???!)
     #[arg(long, env = "SATISDOCKERY_DISABLE_SEASONALEVENTS")]
     pub disable_seasonalevents: bool,
+    /// Seconds with no players before saving and stopping the game. Omit to keep it running.
+    #[arg(
+        long,
+        env = "SATISDOCKERY_IDLE_TIMEOUT",
+        requires = "idle_api_token_file"
+    )]
+    pub idle_timeout: Option<NonZeroU64>,
+    /// File containing the server's application API token for idle shutdown.
+    #[arg(
+        long,
+        env = "SATISDOCKERY_IDLE_API_TOKEN_FILE",
+        requires = "idle_timeout"
+    )]
+    pub idle_api_token_file: Option<PathBuf>,
     /// Add Unreal arguments for the dedicated server if you want to do anything more besides the default args
     #[arg(
         long,

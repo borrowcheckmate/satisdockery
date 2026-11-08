@@ -29,7 +29,7 @@ pub async fn run(args: &Args) -> Result<()> {
     log::info!("Preparation finished successfully!");
 
     if !args.skip_run {
-        server::run(&args.path, &args.server)?;
+        server::run_configured(&args.path, &args.server).await?;
     }
     Ok(())
 }

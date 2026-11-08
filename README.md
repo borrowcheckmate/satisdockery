@@ -23,6 +23,7 @@ satisdockery --path /home/satisdockery/satisfactory --mods "RefinedPower:>=4.0.4
 | --- | --- | --- |
 | `--path` | required | Satisfactory installation directory |
 | `--mods` | none | Comma separated `Name:constraint` list |
+| `--experimental` | off | Install the experimental Steam branch |
 | `--skip-update` | off | Do not download or update the server |
 | `--skip-run` | off | Prepare the installation but do not start the server |
 | `--players` | `4` | Maximum number of players |
@@ -35,10 +36,22 @@ satisdockery --path /home/satisdockery/satisfactory --mods "RefinedPower:>=4.0.4
 | `--enable-serverstreaming` | off | Only stream part of the world to clients |
 | `--disable-seasonalevents` | off | Disable seasonal events |
 | `--idle-timeout` | off | Seconds without players before saving and stopping the game |
-| `--idle-api-token-file` | none | File containing the application API token for idle shutdown |
+| `--trust-local-api` | off | Allow tokenless admin API access from loopback |
+| `--idle-api-token-file` | none | Application API token file for idle shutdown or the terminal console |
+| `--console` | off | Forward terminal input to the server console |
 | `--additional-dedicatedserver-args` | none | Extra Unreal arguments, comma separated |
 
 Every option can also be set through an environment variable named `SATISDOCKERY_` followed by the option in upper case, for example `SATISDOCKERY_PLAYERS=8` or `SATISDOCKERY_MODS=RefinedPower:>=4.0.44`. Switches take `true` or `false`. Run `satisdockery --help` for the authoritative list.
+
+By default, the updater uses the public Steam branch. Set `SATISDOCKERY_EXPERIMENTAL=true` to switch to experimental. Unset it or set it to `false` and run the updater again to return to public. Back up your saves before switching branches.
+
+### Managed mods
+
+SatisDockery keeps matching managed versions and removes managed mods and dependencies that are no longer resolved. An empty mod list removes all managed mods. A mod installed by hand or by an older SatisDockery version has no ownership record. It stays in place and can be reused if its descriptor reports the requested version. To let SatisDockery manage it, move that directory out of `FactoryGame/Mods` and restart with the mod listed.
+
+### Logs
+
+SatisDockery logs the update, mod reconciliation, and server phases with timestamped one-line messages. Set `RUST_LOG=debug` for resolution details. DepotDownloader and the game keep their native output.
 
 ## Docker
 
@@ -62,15 +75,26 @@ volumes:
 
 The server is downloaded into the volume on the first start and updated on every start.
 
+## Local API access
+
+For a container on Docker's default bridge network, set `SATISDOCKERY_TRUST_LOCAL_API=true` to use idle shutdown or the terminal console without creating a token. SatisDockery enables the game's loopback-only admin access when either feature is active. Any process that can connect through the game's loopback interface gets admin API access.
+
+Use token authentication with host networking, shared network namespaces, or a proxy that connects to the game over loopback. In Server Manager's console, run `server.GenerateAPIToken` and mount the resulting token file as a read-only secret. Set `SATISDOCKERY_IDLE_API_TOKEN_FILE` to its path inside the container. A configured token file takes precedence over the loopback setting.
+
 ## Idle shutdown and UDP wake
 
 1. Start the server normally, claim it, and set **Auto-Load Session Name** to the session you want to resume.
-2. In Server Manager's console, run `server.GenerateAPIToken`. Put the token in a file readable by SatisDockery. With Docker, mount the file as a read-only secret.
-3. Set `SATISDOCKERY_IDLE_TIMEOUT=900` and `SATISDOCKERY_IDLE_API_TOKEN_FILE` to the path of that file inside the container. Publish the game port over both UDP and TCP as shown above.
+2. Configure [local API access](#local-api-access) and set `SATISDOCKERY_IDLE_TIMEOUT=900`. Publish the game port over both UDP and TCP as shown above.
 
 SatisDockery checks the game over HTTPS on loopback. The server stays up if a poll or save fails, or if the active session differs from the session set to autoload. Each session has a dedicated save with the prefix `SatisDockery_Idle_`.
 
 After an idle shutdown, the container stays up. A valid UDP status poll starts the game again. Opening Server Manager or running a UDP status monitor can wake it even if nobody joins. If the first join times out, wait for the world to load and try again.
+
+## Attached server console
+
+Configure [local API access](#local-api-access). Set `SATISDOCKERY_CONSOLE=true` and enable `stdin_open: true` and `tty: true` in Compose. With `docker run`, use `-it` instead.
+
+Attach with `docker attach <container>`. Each nonempty line goes to the game's HTTPS console API, and the response appears in the container output. Use Ctrl-P then Ctrl-Q to detach. If the game is asleep, wake it through the game client before sending console commands.
 
 ## Migrating from Wolveix's image
 

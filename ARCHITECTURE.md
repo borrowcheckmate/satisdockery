@@ -33,11 +33,11 @@ DepotDownloader releases are pinned per architecture together with the SHA-256 o
 - `request` parses `Name:constraint` input.
 - `catalog` queries the ficsit.app GraphQL API (`graphql/resolve_mods.graphql`) and filters out versions that do not work with the installed game.
 - `resolver` picks the highest version of every mod that satisfies the constraints of everything depending on it, fetching dependencies it has not seen yet.
-- `installer` downloads the packages and extracts them into `FactoryGame/Mods`, refusing mod names that could escape that directory.
+- `installer` downloads the packages and extracts them into `FactoryGame/Mods`, refusing mod names that could escape that directory. Per-plugin ownership records identify managed versions and allow reconciliation without removing unmanaged mods.
 
 ### `server`
 
-`settings` defines the server options, `arguments` turns them into Unreal command line arguments, and `permissions` restores execute bits that depot downloads do not preserve. On `aarch64` the server is started through `box64`. When idle shutdown is enabled, `idle` supervises the game process, saves and shuts it down through the HTTPS API, and listens on the UDP game port between launches.
+`settings` defines the server options, `arguments` turns them into Unreal command line arguments, and `permissions` restores execute bits that depot downloads do not preserve. On `aarch64` the server is started through `box64`. `process` supervises the game and forwards shutdown signals. The optional console and idle timer share the local HTTPS API client. Between idle shutdown and restart, `wake` listens on the UDP game port.
 
 ## Layout rules
 

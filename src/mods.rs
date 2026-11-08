@@ -17,17 +17,15 @@ pub use package::Package;
 /// Fails when a request is malformed or the mod catalog cannot be queried.
 pub async fn resolve_packages(requested: &[String], game_build: Version) -> Result<Vec<Package>> {
     if requested.is_empty() {
-        log::info!("No mods provided so will skip processing.");
         return Ok(Vec::new());
     }
 
-    log::info!("Processing mods...");
+    log::info!("Resolving mods for game build {game_build}");
     let mut requests = request::parse_all(requested)?;
     requests.push(request::ModRequest::mod_loader()?);
-    log::info!(
-        "Mods requested: \n{}",
-        serde_json::to_string_pretty(&requests)?
-    );
+    for request in &requests {
+        log::debug!("Requested mod {} {}", request.name, request.version);
+    }
 
     let mut catalog = catalog::fetch(&requests).await?;
     catalog::retain_compatible(&mut catalog, &game_build);

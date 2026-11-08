@@ -1,89 +1,17 @@
-mod api;
-mod wake;
-
-use std::{
-    io,
-    net::{Ipv4Addr, TcpListener},
-    num::NonZeroU64,
-    process::Command,
-    time::Duration,
-};
+use std::time::Duration;
 
 use sha2::{Digest, Sha256};
-use tokio::{
-    process::Command as AsyncCommand,
-    time::{self, Instant, MissedTickBehavior},
-};
+use tokio::time::{self, Instant, MissedTickBehavior};
 
-use super::ServerSettings;
-use crate::{Error, Result};
-
-use api::{Api, GameState};
+use super::api::{Api, GameState};
+use crate::Result;
 
 const POLL_PERIOD: Duration = Duration::from_secs(15);
-const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(30);
 
-pub(super) async fn run(
-    command: Command,
-    settings: &ServerSettings,
-    idle_timeout: NonZeroU64,
-) -> Result<()> {
-    if settings.game_port == 0 {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            "Idle shutdown requires a fixed game port",
-        )
-        .into());
-    }
-    let api = Api::new(settings).await?;
-    let idle_timeout = Duration::from_secs(idle_timeout.get());
-
-    // Check that the configured port does not already belong to another server.
-    drop(TcpListener::bind((
-        Ipv4Addr::LOCALHOST,
-        settings.game_port,
-    ))?);
-    drop(wake::bind(settings.game_port)?);
-
-    let mut command = AsyncCommand::from(command);
-    while run_child(&mut command, &api, idle_timeout).await? {
-        let socket = wake::bind(settings.game_port)?;
-        log::info!("Game is stopped; waiting for a UDP status request");
-        wake::wait(socket).await?;
-        log::info!("UDP status request received; starting the game");
-    }
-    log::info!("Server shutdown completed");
-    Ok(())
-}
-
-async fn run_child(command: &mut AsyncCommand, api: &Api, idle_timeout: Duration) -> Result<bool> {
-    let mut child = command.spawn()?;
-    let (status, idle_shutdown) = loop {
-        tokio::select! {
-            biased;
-            () = monitor(api, idle_timeout) => {}
-            status = child.wait() => break (status?, false),
-        }
-        match time::timeout(SHUTDOWN_TIMEOUT, child.wait()).await {
-            Ok(status) => break (status?, true),
-            Err(_) => log::warn!("Game did not exit after the idle shutdown request"),
-        }
+pub(super) async fn monitor(config: Option<(&Api, Duration)>) {
+    let Some((api, idle_timeout)) = config else {
+        return std::future::pending().await;
     };
-    if status.success() {
-        Ok(idle_shutdown)
-    } else {
-        Err(Error::CommandFailed {
-            program: command
-                .as_std()
-                .get_program()
-                .to_string_lossy()
-                .into_owned(),
-            status,
-        })
-    }
-}
-
-async fn monitor(api: &Api, idle_timeout: Duration) {
     let mut interval = time::interval(POLL_PERIOD.min(idle_timeout));
     interval.set_missed_tick_behavior(MissedTickBehavior::Delay);
     let mut idle = Idle::default();

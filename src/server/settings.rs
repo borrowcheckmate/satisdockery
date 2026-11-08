@@ -7,6 +7,9 @@ use clap::Args;
     reason = "each bool is an independent command line switch"
 )]
 #[derive(Debug, Args)]
+#[command(group(clap::ArgGroup::new("server_api_access")
+    .args(["idle_api_token_file", "trust_local_api"])
+    .multiple(true)))]
 pub struct ServerSettings {
     /// Amount of max players
     #[arg(long, env = "SATISDOCKERY_PLAYERS", default_value_t = 4)]
@@ -42,14 +45,20 @@ pub struct ServerSettings {
     #[arg(
         long,
         env = "SATISDOCKERY_IDLE_TIMEOUT",
-        requires = "idle_api_token_file"
+        requires = "server_api_access"
     )]
     pub idle_timeout: Option<NonZeroU64>,
-    /// File containing the server's application API token for idle shutdown.
+    /// Forward terminal input to the game console over the server API.
+    #[arg(long, env = "SATISDOCKERY_CONSOLE", requires = "server_api_access")]
+    pub console: bool,
+    /// Grant admin API access to processes on loopback when no API token file is set.
+    #[arg(long, env = "SATISDOCKERY_TRUST_LOCAL_API")]
+    pub trust_local_api: bool,
+    /// File containing the server's application API token for console access or idle shutdown.
     #[arg(
         long,
-        env = "SATISDOCKERY_IDLE_API_TOKEN_FILE",
-        requires = "idle_timeout"
+        visible_alias = "api-token-file",
+        env = "SATISDOCKERY_IDLE_API_TOKEN_FILE"
     )]
     pub idle_api_token_file: Option<PathBuf>,
     /// Add Unreal arguments for the dedicated server if you want to do anything more besides the default args

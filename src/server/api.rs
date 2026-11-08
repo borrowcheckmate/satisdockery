@@ -1,6 +1,10 @@
 use std::{io, time::Duration};
 
-use reqwest::{Client, StatusCode, header::HeaderValue, redirect::Policy};
+use reqwest::{
+    Client, StatusCode,
+    header::{AUTHORIZATION, HeaderMap, HeaderValue},
+    redirect::Policy,
+};
 use serde::Deserialize;
 use serde_json::{Value, json};
 
@@ -10,7 +14,6 @@ use crate::Result;
 pub(super) struct Api {
     client: Client,
     endpoint: String,
-    authorization: HeaderValue,
 }
 
 #[derive(Debug, Deserialize)]
@@ -24,34 +27,16 @@ pub(super) struct GameState {
 
 impl Api {
     pub(super) async fn new(settings: &ServerSettings) -> Result<Self> {
-        let token_file = settings.idle_api_token_file.as_ref().ok_or_else(|| {
-            io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "Idle shutdown requires an API token file",
-            )
-        })?;
-        let token = tokio::fs::read_to_string(token_file).await?;
-        let token = token.trim();
-        if token.is_empty() {
-            return Err(
-                io::Error::new(io::ErrorKind::InvalidInput, "Empty application API token").into(),
-            );
-        }
-        let mut authorization =
-            HeaderValue::from_str(&format!("Bearer {token}")).map_err(|_| {
-                io::Error::new(io::ErrorKind::InvalidInput, "Invalid application API token")
-            })?;
-        authorization.set_sensitive(true);
         let client = Client::builder()
             .no_proxy()
             .redirect(Policy::none())
+            .default_headers(api_headers(settings).await?)
             // The game ships a self-signed certificate. This client only talks to loopback.
             .tls_danger_accept_invalid_certs(true)
             .build()?;
         Ok(Self {
             client,
             endpoint: format!("https://127.0.0.1:{}/api/v1", settings.game_port),
-            authorization,
         })
     }
 
@@ -77,6 +62,13 @@ impl Api {
         Ok(())
     }
 
+    pub(super) async fn run_command(&self, command: &str) -> Result<(String, bool)> {
+        let data = self
+            .call("RunCommand", json!({ "command": command }))
+            .await?;
+        command_result(data)
+    }
+
     async fn call(&self, function: &str, data: Value) -> Result<Value> {
         let timeout = if function == "SaveGame" {
             Duration::from_secs(120)
@@ -87,7 +79,6 @@ impl Api {
             .client
             .post(&self.endpoint)
             .timeout(timeout)
-            .header(reqwest::header::AUTHORIZATION, self.authorization.clone())
             .json(&json!({ "function": function, "data": data }))
             .send()
             .await?
@@ -101,6 +92,46 @@ impl Api {
             .into()),
         }
     }
+}
+
+async fn api_headers(settings: &ServerSettings) -> Result<HeaderMap> {
+    let mut headers = HeaderMap::new();
+    let Some(token_file) = &settings.idle_api_token_file else {
+        if settings.trust_local_api {
+            return Ok(headers);
+        }
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "Server API access requires --trust-local-api or an application token file",
+        )
+        .into());
+    };
+    let token = tokio::fs::read_to_string(token_file).await?;
+    let token = token.trim();
+    if token.is_empty() {
+        return Err(
+            io::Error::new(io::ErrorKind::InvalidInput, "Empty application API token").into(),
+        );
+    }
+    let mut authorization = HeaderValue::from_str(&format!("Bearer {token}")).map_err(|_| {
+        io::Error::new(io::ErrorKind::InvalidInput, "Invalid application API token")
+    })?;
+    authorization.set_sensitive(true);
+    headers.insert(AUTHORIZATION, authorization);
+    Ok(headers)
+}
+
+fn command_result(data: Value) -> Result<(String, bool)> {
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct Output {
+        #[serde(default)]
+        command_result: String,
+        return_value: Option<bool>,
+    }
+
+    let output: Output = serde_json::from_value(data)?;
+    Ok((output.command_result, output.return_value.unwrap_or(true)))
 }
 
 fn completed_response(body: &[u8], function: &str) -> Result<Value> {
@@ -122,6 +153,17 @@ fn completed_response(body: &[u8], function: &str) -> Result<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parses_console_output_and_failure() {
+        let data = json!({ "commandResult": "Unknown command", "returnValue": false });
+        assert_eq!(
+            command_result(data).unwrap(),
+            ("Unknown command".into(), false)
+        );
+        let older = json!({ "commandResult": "Game saved" });
+        assert_eq!(command_result(older).unwrap(), ("Game saved".into(), true));
+    }
 
     #[test]
     fn an_api_error_in_a_successful_http_response_is_still_a_failure() {

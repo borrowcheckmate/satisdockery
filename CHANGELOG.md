@@ -11,11 +11,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- save and stop idle servers and wake on UDP
+- Save and stop idle servers, then wake them on UDP status requests
+- Run server console commands from an attached terminal
+- Opt in to tokenless local API access for the console and idle shutdown
 
 ### Fixed
 
-- publish the game HTTPS port
+- Publish the game HTTPS port
+- Reuse matching mods and uninstall removed mods owned by SatisDockery
+- Honor the Steam experimental branch setting
+- Make startup logs easier to follow and forward shutdown signals to the game
+
+### Changed
+
+- Verify the pinned dependency audit tool before running it in CI
 
 ## [0.1.0](https://github.com/borrowcheckmate/satisdockery/releases/tag/v0.1.0) - 2026-10-28
 
